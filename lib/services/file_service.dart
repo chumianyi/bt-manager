@@ -26,9 +26,9 @@ class FileService {
           name: item.filename,
           path: '$path/${item.filename}',
           isDirectory: stat.isDirectory,
-          isLink: stat.isLink,
+          isLink: false,
           size: stat.size ?? 0,
-          permissions: _formatPermissions(stat.mode ?? 0),
+          permissions: _formatPermissions((stat.mode as int?) ?? 0),
           owner: '',
           group: '',
           modified: DateTime.fromMillisecondsSinceEpoch((stat.modifyTime ?? 0) * 1000),
@@ -134,7 +134,7 @@ class FileService {
   Future<void> createDirectory(String path) async {
     try {
       await _ensureSftp();
-      await _sftp!.mkdir(path, mode: 0x1ED);
+      await _sftp!.mkdir(path);
     } catch (e) {
       await sshService.execute('mkdir -p "$path"', useSudo: true);
     }
