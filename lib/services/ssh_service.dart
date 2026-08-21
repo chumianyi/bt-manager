@@ -9,6 +9,7 @@ class SSHService {
   SSHClient? _jumpClient;
   ServerConfig? _currentConfig;
   bool _isConnected = false;
+  bool _useJump = false;
   final StreamController<String> _terminalOutput = StreamController<String>.broadcast();
   Stream<String> get terminalOutput => _terminalOutput.stream;
 
@@ -17,7 +18,7 @@ class SSHService {
 
   Future<void> connect(ServerConfig config) async {
     try {
-      if (config.useJumpServer && config.jumpHost != null) {
+      if (config.useJumpServer && config.jumpHost != null && config.jumpHost!.isNotEmpty) {
         await _connectWithJump(config);
       } else {
         await _connectDirect(config);
@@ -36,7 +37,6 @@ class SSHService {
       socket,
       username: config.username,
       onPasswordRequest: () => config.password,
-      onAuthenticated: () {},
     );
     await _client!.authenticated;
   }
@@ -49,14 +49,15 @@ class SSHService {
       onPasswordRequest: () => config.jumpPassword ?? config.password,
     );
     await _jumpClient!.authenticated;
+    _useJump = true;
+    _client = _jumpClient;
+  }
 
-    final forward = await _jumpClient!.forwardLocal(config.host, config.port);
-    _client = SSHClient(
-      forward,
-      username: config.username,
-      onPasswordRequest: () => config.password,
-    );
-    await _client!.authenticated;
+  String _wrapCommand(String command) {
+    if (!_useJump || _currentConfig == null) return command;
+    final cfg = _currentConfig!;
+    final sshCmd = 'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p ${cfg.port} ${cfg.username}@${cfg.host}';
+    return '$sshCmd \'$command\'';
   }
 
   Future<String> execute(String command, {bool useSudo = false}) async {
@@ -64,7 +65,11 @@ class SSHService {
       throw Exception('未连接到服务器');
     }
     try {
-      final cmd = useSudo ? 'echo "${_currentConfig?.password ?? ''}" | sudo -S $command 2>&1' : command;
+      var cmd = command;
+      if (useSudo) {
+        cmd = 'echo "${_currentConfig?.password ?? ''}" | sudo -S $cmd 2>&1';
+      }
+      cmd = _wrapCommand(cmd);
       final result = await _client!.run(cmd);
       return utf8.decode(result);
     } catch (e) {
@@ -80,15 +85,24 @@ class SSHService {
       pty: const SSHPtyConfig(
         width: 80,
         height: 24,
-        terminal: 'xterm-256color',
       ),
     );
+    if (_useJump && _currentConfig != null) {
+      final cfg = _currentConfig!;
+      final sshCmd = 'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p ${cfg.port} ${cfg.username}@${cfg.host}\n';
+      session.write(utf8.encode(sshCmd));
+      await Future.delayed(const Duration(milliseconds: 500));
+      session.write(utf8.encode('${cfg.password}\n'));
+    }
     return session;
   }
 
-  Future<SSHSftp> openSftp() async {
+  Future<SftpClient> openSftp() async {
     if (_client == null || !_isConnected) {
       throw Exception('未连接到服务器');
+    }
+    if (_useJump) {
+      throw Exception('跳板机模式下暂不支持SFTP，请使用终端操作文件');
     }
     return await _client!.sftp();
   }
@@ -104,6 +118,7 @@ class SSHService {
     _jumpClient = null;
     _isConnected = false;
     _currentConfig = null;
+    _useJump = false;
   }
 
   Future<bool> testConnection(ServerConfig config) async {

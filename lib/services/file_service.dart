@@ -6,7 +6,7 @@ import 'ssh_service.dart';
 
 class FileService {
   final SSHService sshService;
-  SSHSftp? _sftp;
+  SftpClient? _sftp;
 
   FileService(this.sshService);
 

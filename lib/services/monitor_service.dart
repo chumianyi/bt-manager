@@ -79,7 +79,7 @@ echo "CPU_CORES=\$CORES"
     return int.tryParse(match?.group(1) ?? '1') ?? 1;
   }
 
-  Map<String, int> _parseMemory(String output) {
+  Map<String, num> _parseMemory(String output) {
     final lines = output.split('\n');
     int total = 0, available = 0, buffers = 0, cached = 0;
     for (final line in lines) {
@@ -102,7 +102,7 @@ echo "CPU_CORES=\$CORES"
     };
   }
 
-  Map<String, int> _parseSwap(String output) {
+  Map<String, num> _parseSwap(String output) {
     final lines = output.split('\n');
     int total = 0, free = 0;
     for (final line in lines) {

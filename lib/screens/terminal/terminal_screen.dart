@@ -215,19 +215,6 @@ class _TerminalScreenState extends State<TerminalScreen> {
                         onSubmitted: (v) {
                           if (v.isNotEmpty) _sendCommand(v);
                         },
-                        onKeyEvent: (event) {
-                          if (event is KeyDownEvent) {
-                            if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                              _historyNavigate(true);
-                              return KeyEventResult.handled;
-                            }
-                            if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                              _historyNavigate(false);
-                              return KeyEventResult.handled;
-                            }
-                          }
-                          return KeyEventResult.ignored;
-                        },
                       ),
                     ),
                   ],
